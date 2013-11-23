@@ -179,7 +179,7 @@ static int vnc_init(int fd)
 		memset(passwd, 0, strlen(passwd));
 	}
 
-	clientinit.shared = 1;
+	clientinit.shared = 1; // allow shared connections by default
 	write(fd, &clientinit, sizeof(clientinit));
 	read(fd, &serverinit, sizeof(serverinit));
 
@@ -510,38 +510,45 @@ static void term_cleanup(struct termios *ti)
 	dprintf(STDOUT_FILENO, "\033[?25h");	// show cursor
 }
 
-static int mainloop(int vnc_fd, int kbd_fd, int rat_fd)
+static int mainloop(int vnc_fd, int kbd_fd, int rat_fd, int view_only)
 {
 	struct pollfd ufds[3];
 	int pending = 0;
 	int err;
-	ufds[0].fd = kbd_fd;
-	ufds[1].fd = vnc_fd;
+	ufds[0].fd = vnc_fd;
+	ufds[1].fd = kbd_fd;
 	ufds[2].fd = rat_fd;
 	ufds[0].events =
 	ufds[1].events =
 	ufds[2].events = POLLIN;
 	vnc_refresh(vnc_fd, 0);
 	while (1) {
-		err = poll(ufds, 3, 500);
+                if( view_only ) {
+			err = poll(ufds, 1, 500);
+                }
+                else {
+			err = poll(ufds, 3, 500);
+                }
 		if (err == -1 && errno != EINTR)
 			break;
 		if (!err)
 			continue;
 		err = -2;
-		if (ufds[0].revents & POLLIN)
-			if (kbd_event(vnc_fd, kbd_fd) == -1)
-				break;
-		err--;
-		if (ufds[1].revents & POLLIN) {
+		if (ufds[0].revents & POLLIN) {
 			if (vnc_event(vnc_fd) == -1)
 				break;
 			pending = 0;
 		}
 		err--;
-		if (ufds[2].revents & POLLIN)
-			if (rat_event(vnc_fd, rat_fd) == -1)
-				break;
+                if( !view_only ) {
+			if (ufds[1].revents & POLLIN)
+				if (kbd_event(vnc_fd, kbd_fd) == -1)
+					break;
+			err--;
+			if (ufds[2].revents & POLLIN)
+				if (rat_event(vnc_fd, rat_fd) == -1)
+					break;
+                }
 		if (!pending++)
 			vnc_refresh(vnc_fd, 1);
 	}
@@ -552,6 +559,7 @@ void show_usage(char *prog)
 {
 	printf("Usage : %s [options] server [port]\n", prog);
 	printf("Valid options:\n");
+	printf("\t[-o] observe only\n");
 	printf("\t[-b bpp-bits] specify bits per pixel\n");
 	printf("\t[-p passwd-file] read encrypted password from this file\n");
 	printf("\t[-w save-passwd-file] write encrypted password to this file\n");
@@ -569,7 +577,7 @@ int main(int argc, char * argv[])
 	char *port = VNC_PORT;
 	char *host = "127.0.0.1";
 	struct termios ti;
-	int vnc_fd, rat_fd, status;
+	int vnc_fd, rat_fd, status, view_only = 0;
 
 	while (1)
 	{
@@ -577,6 +585,9 @@ int main(int argc, char * argv[])
 		if (ch == -1) break;
 		switch (ch)
 		{
+		case 'o':
+  			view_only = 1;
+			break;
 		case 'b':
   			bpp = atoi(optarg) >> 3;
 			break;
@@ -618,9 +629,14 @@ int main(int argc, char * argv[])
 		return 2;
 	}
 	term_setup(&ti);
-	rat_fd = open("/dev/input/mice", O_RDONLY);
+        if( !view_only ) {
+		rat_fd = open("/dev/input/mice", O_RDONLY);
+        }
+	else {
+		rat_fd = NULL;
+        }
 
-	status = mainloop(vnc_fd, 0, rat_fd);
+	status = mainloop(vnc_fd, 0, rat_fd, view_only);
 
 	term_cleanup(&ti);
 	vnc_free();

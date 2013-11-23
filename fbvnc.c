@@ -581,7 +581,7 @@ int main(int argc, char * argv[])
 
 	while (1)
 	{
-		int ch = getopt(argc, argv, "b:p:w:hv");
+		int ch = getopt(argc, argv, "b:p:w:hvo");
 		if (ch == -1) break;
 		switch (ch)
 		{
@@ -628,8 +628,8 @@ int main(int argc, char * argv[])
 		fprintf(stderr, "vnc init failed! %d\n", status);
 		return 2;
 	}
-	term_setup(&ti);
         if( !view_only ) {
+	        term_setup(&ti);
 		rat_fd = open("/dev/input/mice", O_RDONLY);
         }
 	else {
@@ -638,9 +638,11 @@ int main(int argc, char * argv[])
 
 	status = mainloop(vnc_fd, 0, rat_fd, view_only);
 
-	term_cleanup(&ti);
+        if ( !view_only ) {
+		term_cleanup(&ti);
+		close(rat_fd);
+        }
 	vnc_free();
 	close(vnc_fd);
-	close(rat_fd);
 	return 2 - status;
 }

@@ -1,8 +1,19 @@
 # fbvnc #
 
-patched framebuffer VNC client for embeded system like Raspberry Pi
+Patched framebuffer VNC client for view-only use on the Raspberry Pi
 
-## Introduction ##
+Features:
+
+* Minimal binary (25KB)
+* Very fast framebuffer rendering (16-bit over Ethernet is pretty much instantaneous)
+* View-only support (for digital signage)
+
+TODO:
+
+* Fix naive authentication code so that it supports RFB 3.8 auth modes and we can use Macs as servers
+
+----
+## Original README ##
 
 There is already a framebuffer VNC client for Linux:
 
@@ -25,7 +36,6 @@ These things should be done later:
 * ...
 
 ## Notes about framebuffer depth (Raspbery Pi) ##
-
 
 This fbvnc project assumes framebuffer color depth is 32bit.
 
